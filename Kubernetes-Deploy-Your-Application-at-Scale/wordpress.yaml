@@ -1,0 +1,205 @@
+# Namespace for the application
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: wordpress
+
+# PersistentVolume
+# ---
+# apiVersion: v1
+# kind: PersistentVolume
+# metadata:
+#   name: my-pv
+# spec:
+#   capacity:
+#     storage: 10Gi  # Adjust as needed
+#   accessModes:
+#     - ReadWriteOnce
+#   storageClassName: standard  # Using standard storage
+#   persistentVolumeReclaimPolicy: Retain  # Optional: Data remains on disk after PVC deletion
+#   hostPath:  # Using hostPath for minikube
+#     path: /data/my-pv
+
+---
+# PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wordpress-pvc
+  namespace: wordpress
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 5Gi  # Adjust as needed
+
+# PersistentVolumeClaim
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: wordpress
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 5Gi  # Adjust as needed
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wp-setup-script
+  namespace: wordpress
+data:
+  setup.sh: |+
+    #!/bin/bash
+    # Configure WordPress using environment variables
+    wp core install --url="${WORDPRESS_SITE_URL}" --title="${WORDPRESS_SITE_TITLE}" --admin_user="${WORDPRESS_ADMIN_USER}" --admin_password="${WORDPRESS_ADMIN_PASSWORD}" --admin_email="${WORDPRESS_ADMIN_EMAIL}"
+    wp core language activate "${WORDPRESS_LANGUAGE}"
+
+
+---
+# Frontend (WordPress) deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wordpress-deployment
+  namespace: wordpress
+spec:
+  replicas: 1  # Adjust as needed
+  selector:
+    matchLabels:
+      app: wordpress
+  template:
+    metadata:
+      labels:
+        app: wordpress
+    spec:
+      containers:
+      - name: wordpress
+        image: wordpress:latest  # Replace with your preferred image
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/bin/sh", "/setup.sh"]
+        ports:
+        - containerPort: 80
+        env:
+        - name: WORDPRESS_DB_HOST
+          value: wordpress-mysql  # Consistent with MySQL service name
+        - name: WORDPRESS_DB_USER
+          value: wordpressuser  # Consistent database user
+        - name: WORDPRESS_DB_PASSWORD
+          value: wordpresspassword  # Consistent database password
+        - name: WORDPRESS_SITE_TITLE
+          value: KCD Kerala - K8S Demo  # Example site title
+        - name: WORDPRESS_ADMIN_USER
+          value: wpadmin  # Example username
+        - name: WORDPRESS_ADMIN_PASSWORD
+          value: password123  # Example password
+        - name: WORDPRESS_ADMIN_EMAIL
+          value: admin@example.com  # Example email
+        - name: WORDPRESS_LANGUAGE
+          value: en_US  # Example language
+        volumeMounts:
+        - name: wordpress-persistent-storage
+          mountPath: /var/www/html
+        - name: wp-setup-script
+          mountPath: /setup.sh
+          readOnly: true  
+      volumes:
+      - name: wordpress-persistent-storage
+        persistentVolumeClaim:
+          claimName: wordpress-pvc
+      - name: wp-setup-script
+        configMap:
+          name: wp-setup-script  # Create a ConfigMap with the script
+      
+
+    
+
+---
+# Backend (MySQL) deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-deployment
+  namespace: wordpress
+spec:
+  replicas: 1  # Adjust as needed
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:5.7  # Replace with your preferred MySQL image
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: password  # Replace with a secure root password
+        - name: MYSQL_DATABASE
+          value: wordpress
+        - name: MYSQL_USER
+          value: wordpressuser  # Consistent database user
+        - name: MYSQL_PASSWORD
+          value: wordpresspassword  # Consistent database password
+        volumeMounts:
+        - name: mysql-persistent-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-persistent-storage
+        persistentVolumeClaim:
+          claimName: mysql-pvc
+
+# ---
+# # Frontend (WordPress) service
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: wordpress-service
+#   namespace: wordpress
+# spec:
+#   selector:
+#     app: wordpress
+#   ports:
+#   - port: 80
+#     targetPort: 80
+
+---
+# Backend (MySQL) service
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress-mysql
+  namespace: wordpress
+spec:
+  selector:
+    app: mysql
+  ports:
+  - port: 3306
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress-app
+  namespace: wordpress
+spec:
+  type: NodePort
+  selector:
+    app: wordpress
+  ports:
+    - port: 8084        # Port exposed within the cluster
+      targetPort: 80    # Port on the pods
+      # nodePort: 30080   # Optional: Specify a specific NodePort (will be auto-assigned if omitted)
