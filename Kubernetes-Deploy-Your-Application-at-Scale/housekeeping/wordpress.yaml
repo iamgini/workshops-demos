@@ -5,8 +5,24 @@ kind: Namespace
 metadata:
   name: wordpress
 
+# PersistentVolume
+# ---
+# apiVersion: v1
+# kind: PersistentVolume
+# metadata:
+#   name: my-pv
+# spec:
+#   capacity:
+#     storage: 10Gi  # Adjust as needed
+#   accessModes:
+#     - ReadWriteOnce
+#   storageClassName: standard  # Using standard storage
+#   persistentVolumeReclaimPolicy: Retain  # Optional: Data remains on disk after PVC deletion
+#   hostPath:  # Using hostPath for minikube
+#     path: /data/my-pv
+
 ---
-# PersistentVolumeClaim for WordPress
+# PersistentVolumeClaim
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -14,13 +30,13 @@ metadata:
   namespace: wordpress
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   storageClassName: standard
   resources:
     requests:
       storage: 5Gi  # Adjust as needed
 
-# PersistentVolumeClaim for MySQL
+# PersistentVolumeClaim
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -75,13 +91,6 @@ spec:
               command: ["/bin/sh", "/setup.sh"]
         ports:
         - containerPort: 80
-        resources:
-          requests:
-            memory: "200Mi"
-            cpu: "100m"
-          limits:
-            memory: "300Mi"
-            cpu: "200m"
         env:
         - name: WORDPRESS_DB_HOST
           value: wordpress-mysql  # Consistent with MySQL service name
