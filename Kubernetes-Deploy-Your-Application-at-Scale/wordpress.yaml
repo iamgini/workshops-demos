@@ -14,7 +14,7 @@ metadata:
   namespace: wordpress
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   storageClassName: standard
   resources:
     requests:
@@ -36,20 +36,6 @@ spec:
       storage: 5Gi  # Adjust as needed
 
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: wp-setup-script
-  namespace: wordpress
-data:
-  setup.sh: |+
-    #!/bin/bash
-    # Configure WordPress using environment variables
-    wp core install --url="${WORDPRESS_SITE_URL}" --title="${WORDPRESS_SITE_TITLE}" --admin_user="${WORDPRESS_ADMIN_USER}" --admin_password="${WORDPRESS_ADMIN_PASSWORD}" --admin_email="${WORDPRESS_ADMIN_EMAIL}"
-    wp core language activate "${WORDPRESS_LANGUAGE}"
-
-
----
 # Frontend (WordPress) deployment
 apiVersion: apps/v1
 kind: Deployment
@@ -69,10 +55,6 @@ spec:
       containers:
       - name: wordpress
         image: wordpress:latest  # Replace with your preferred image
-        lifecycle:
-          postStart:
-            exec:
-              command: ["/bin/sh", "/setup.sh"]
         ports:
         - containerPort: 80
         resources:
@@ -84,37 +66,29 @@ spec:
             cpu: "200m"
         env:
         - name: WORDPRESS_DB_HOST
-          value: wordpress-mysql  # Consistent with MySQL service name
+          value: wordpress-mysql # Consistent with MySQL service name
         - name: WORDPRESS_DB_USER
           value: wordpressuser  # Consistent database user
         - name: WORDPRESS_DB_PASSWORD
           value: wordpresspassword  # Consistent database password
-        - name: WORDPRESS_SITE_TITLE
-          value: KCD Kerala - K8S Demo  # Example site title
-        - name: WORDPRESS_ADMIN_USER
-          value: wpadmin  # Example username
-        - name: WORDPRESS_ADMIN_PASSWORD
-          value: password123  # Example password
-        - name: WORDPRESS_ADMIN_EMAIL
-          value: admin@example.com  # Example email
-        - name: WORDPRESS_LANGUAGE
-          value: en_US  # Example language
+        - name: WORDPRESS_DB_NAME
+          value: wordpressdb
+
         volumeMounts:
         - name: wordpress-persistent-storage
           mountPath: /var/www/html
-        - name: wp-setup-script
-          mountPath: /setup.sh
-          readOnly: true  
+        # - name: wp-setup-script
+        #   mountPath: /setup.sh
+        #   readOnly: true  
       volumes:
       - name: wordpress-persistent-storage
         persistentVolumeClaim:
           claimName: wordpress-pvc
-      - name: wp-setup-script
-        configMap:
-          name: wp-setup-script  # Create a ConfigMap with the script
+      # - name: wp-setup-script
+      #   configMap:
+      #     name: wp-setup-script  # Create a ConfigMap with the script
       
-
-    
+   
 
 ---
 # Backend (MySQL) deployment
@@ -140,7 +114,7 @@ spec:
         - name: MYSQL_ROOT_PASSWORD
           value: password  # Replace with a secure root password
         - name: MYSQL_DATABASE
-          value: wordpress
+          value: wordpressdb
         - name: MYSQL_USER
           value: wordpressuser  # Consistent database user
         - name: MYSQL_PASSWORD
@@ -194,3 +168,24 @@ spec:
     - port: 8084        # Port exposed within the cluster
       targetPort: 80    # Port on the pods
       # nodePort: 30080   # Optional: Specify a specific NodePort (will be auto-assigned if omitted)
+
+# You can configure the HPA using YAML as follows if required
+# ---
+# apiVersion: autoscaling/v2beta2
+# kind: HorizontalPodAutoscaler
+# metadata:
+#   name: your-hpa
+# spec:
+#   scaleTargetRef:
+#     apiVersion: apps/v1
+#     kind: Deployment
+#     name: your-deployment
+#   minReplicas: 1
+#   maxReplicas: 10
+#   metrics:
+#   - type: Resource
+#     resource:
+#       name: memory
+#       target:
+#         type: Utilization
+#         averageValue: 500Mi  # Adjust the target average memory utilization as needed
