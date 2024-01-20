@@ -55,6 +55,10 @@ spec:
       containers:
       - name: wordpress
         image: wordpress:latest  # Replace with your preferred image
+        # lifecycle:
+        #   postStart:
+        #     exec:
+        #       command: ["/bin/sh", "/setup.sh"]
         ports:
         - containerPort: 80
         resources:
