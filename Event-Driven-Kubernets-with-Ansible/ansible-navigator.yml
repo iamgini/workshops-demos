@@ -1,0 +1,27 @@
+---
+ansible-navigator:
+  execution-environment:
+    container-engine: podman
+    image: registry.redhat.io/ansible-automation-platform-24/ee-supported-rhel8:1.0.0-395
+    # image: localhost/ee-supported-rhel8-expect:1.0
+    enabled: true
+    pull:
+      policy: missing
+    # volume-mounts:
+    #   - src: "/home/gmadappa/bau/bau-work/projects/SINGAPORE/SG-BCS-Ansible/Scripts_2024_01_09"
+    #     dest: "/G3App/appfc/script/G3ImmediateShutdownIPS"
+    #     options: "Z"
+  editor:
+    command: code-server {filename}
+    console: false
+
+  logging:
+    # level: debug
+    append: false
+
+  mode: stdout
+
+  playbook-artifact:
+    enable: false
+    replay: artifacts/ansible_artifact.json
+    save-as: artifacts/ansible_artifact.json
