@@ -2,6 +2,7 @@
 
 Local AI Development Made Simple
 
+- [Slide](Podman-AI-Lab-2025-03-18.pdf)
 
 References:
 
